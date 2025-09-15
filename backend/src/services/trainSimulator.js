@@ -1,7 +1,6 @@
 const { query } = require('./db');
 
 // In-memory state to manage train positions.
-// This is a simple way to track state without hitting the database on every update.
 const trainStates = {};
 
 // Function to fetch initial train data and start the simulation.
@@ -10,7 +9,7 @@ async function initializeSimulation() {
   for (const train of trains.rows) {
     trainStates[train.train_no] = {
       ...train,
-      position: 0, // Placeholder for real position on a track
+      position: 0, 
       speed: 0,
       status: 'stopped',
       nextStation: null,
@@ -20,7 +19,7 @@ async function initializeSimulation() {
 }
 
 // Function to simulate train movement.
-function simulateMovement(io) {
+async function simulateMovement(io) {
   // Fetch trains currently enroute from the database
   const q = `
     SELECT tm.*, t.train_no, t.name,
@@ -35,16 +34,17 @@ function simulateMovement(io) {
                   OR (tk.from_station = s2.id AND tk.to_station = s1.id)
     WHERE tm.status = 'enroute'
   `;
-  query(q).then(res => {
-    res.rows.forEach(train => {
+  try {
+    const res = await query(q);
+
+    // Use a for-of loop for sequential asynchronous operations
+    for (const train of res.rows) {
       // Simple simulation: move the train forward by a fixed amount.
       const movement_step = train.speed_kmph / 3.6; // Speed in m/s
-      const new_position = (train.position_m || 0) + movement_step;
+      const new_position = (parseFloat(train.position_m) || 0) + movement_step;
 
       // Check if train has reached the destination
       if (new_position >= train.track_length) {
-        // Update status to 'arrived' or 'at_station'
-        // In a real system, this would trigger more complex logic
         train.status = 'arrived';
         train.position_m = train.track_length;
       } else {
@@ -52,8 +52,8 @@ function simulateMovement(io) {
       }
       
       // Update state in database
-      query('UPDATE train_movements SET position_m = $1, status = $2 WHERE id = $3', [train.position_m, train.status, train.id]);
-
+      await query('UPDATE train_movements SET position_m = $1, status = $2 WHERE id = $3', [new_position, train.status, train.id]);
+      
       // Broadcast the update to all connected clients.
       io.emit('trainUpdate', {
         train_no: train.train_no,
@@ -62,13 +62,15 @@ function simulateMovement(io) {
           status: train.status,
           current_station: train.current_station_code,
           next_station: train.next_station_code,
-          position_m: train.position_m,
+          position_m: new_position,
           eta: train.eta,
         },
         timestamp: new Date(),
       });
-    });
-  }).catch(err => console.error('Simulation error:', err));
+    }
+  } catch (err) {
+    console.error('Simulation error:', err);
+  }
 }
 
 module.exports = {

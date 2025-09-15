@@ -21,7 +21,7 @@ app.use(express.json());
 // Main API routes.
 app.use('/api', apiRoutes);
 
-// Connect to Redis (used for caching or message queues in a more complex setup).
+// Connect to Redis.
 const redisClient = createClient();
 redisClient.on('error', (err) => console.log('Redis Client Error', err));
 
@@ -31,16 +31,19 @@ async function main() {
 
   // Start the train simulation logic.
   await initializeSimulation();
+
   // Update train positions every 5 seconds and broadcast via WebSockets.
-  setInterval(() => {
-    simulateMovement(io);
+  setInterval(async () => {
+    try {
+      await simulateMovement(io);
+    } catch (err) {
+      console.error('Simulation loop error:', err);
+    }
   }, 5000);
 
   // WebSocket connection handler.
   io.on('connection', (socket) => {
     console.log(`A user connected: ${socket.id}`);
-    
-    // You can send initial data to a new client here if needed.
     
     socket.on('disconnect', () => {
       console.log(`User disconnected: ${socket.id}`);
