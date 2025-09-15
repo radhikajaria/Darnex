@@ -1,72 +1,148 @@
-# Railway Traffic Management & Simulation Backend
+# 🚂 Railway Simulation Backend
 
-Welcome to the backend for our Smart India Hackathon project! This repository contains the core logic for the railway simulation, including the database, APIs, and real-time updates.
+This project powers a real-time railway simulation system.  
+It provides APIs and WebSocket streams to track train positions live.  
 
-## 🚀 Getting Started
+---
 
-### 1. Prerequisites
+## 📦 Prerequisites
 
-- **Node.js**: Make sure you have Node.js installed.
-- **PostgreSQL**: Install PostgreSQL and create a database for the project. Note down your username and database name.
-- **Redis**: Install and run a Redis server.
+Before running the project, install the following:
 
-### 2. Setup
+- **Node.js** → [Download](https://nodejs.org/)  
+- **PostgreSQL** → [Download](https://www.postgresql.org/download/)  
+- **Redis** → [Download](https://redis.io/download)  
 
-1.  Clone this repository:
-    `git clone https://github.com/your-username/railway-sim-backend.git`
-    `cd railway-sim-backend`
+### Mac (using Homebrew)
+```bash
+brew install node
+brew install postgresql
+brew install redis
+```
 
-2.  Install dependencies:
-    `npm install`
+### Windows (Manual Install)
+- Node.js → [Node.js Installer](https://nodejs.org/)  
+- PostgreSQL → [PostgreSQL Installer](https://www.postgresql.org/download/windows/)  
+- Redis → [Redis for Windows](https://github.com/microsoftarchive/redis/releases)  
 
-### 3. Database Setup
+---
 
-1.  **Create Schema**: Run the SQL script to create your database tables.
-    ```bash
-    psql -U your_username -d your_dbname -a -f src/db/migrations/20250915_initial_schema.sql
-    ```
-    Replace `your_username` and `your_dbname` with your actual PostgreSQL credentials.
+## ⚙️ Project Setup
 
-2.  **Seed Data**: Populate the tables with initial data.
-    ```bash
-    psql -U your_username -d your_dbname -a -f src/db/seed/seed_data.sql
-    ```
+### 1. Clone the Repository
+```bash
+git clone [repository URL]
+cd [your-project-folder]
+```
 
-### 4. Running the Backend
-
-1.  Start the server:
-    `npm start`
-
-2.  The server will be running at `http://localhost:3000`.
-
-### 5. API Endpoints
-
-The following APIs are available for the frontend team:
-
--   **GET `/api/v1/sections/:station_code/snapshot`**: Get a snapshot of a station, including platforms, tracks, and trains.
-    -   Example: `http://localhost:3000/api/v1/sections/JP/snapshot`
-
--   **GET `/api/v1/trains/:train_no`**: Get details about a specific train, its timetable, and its movements.
-    -   Example: `http://localhost:3000/api/v1/trains/12986`
-
--   **POST `/api/v1/sim/command`**: Simulated control action. Send JSON data with a command.
-    -   Example Body: `{ "train_no": "12986", "command": "hold" }`
-
-### 6. Real-Time Updates (WebSockets)
-
--   The server uses WebSockets to broadcast real-time train position updates.
--   The frontend can connect to `ws://localhost:3000` to receive messages.
--   Listen for the `trainUpdate` event.
-
-**Example Frontend Code:**
+### 2. Update Database Credentials
+Edit `src/services/db.js`:
 ```javascript
-const socket = io('http://localhost:3000');
-
-socket.on('connect', () => {
-  console.log('Connected to WebSocket server');
+const pool = new Pool({
+  user: 'your_username',    // PostgreSQL username (e.g., 'postgres')
+  host: 'localhost',
+  database: 'railway_sim_db',
+  password: 'your_password', // PostgreSQL password
+  port: 5432,
 });
+```
 
-socket.on('trainUpdate', (data) => {
-  console.log('Real-time train update:', data);
-  // Update your frontend dashboard with this data
-});
+### 3. Set Up the Database
+Start PostgreSQL & Redis, then run:
+```bash
+# Enter PostgreSQL shell
+psql -d postgres
+
+# Inside psql
+CREATE DATABASE railway_sim_db;
+CREATE ROLE postgres WITH LOGIN PASSWORD 'your_password';
+ALTER DATABASE railway_sim_db OWNER TO postgres;
+\q
+
+# Load schema & seed data
+psql -U postgres -d railway_sim_db -a -f src/db/migrations/20250915_initial_schema.sql
+psql -U postgres -d railway_sim_db -a -f src/db/seed/seed_data.sql
+```
+
+### 4. Install Node.js Dependencies
+```bash
+npm install
+```
+
+### 5. Start the Backend
+```bash
+npm start
+```
+👉 Server will be running at: **http://localhost:3000**
+
+---
+
+## 🔴 Real-Time Updates
+
+The backend broadcasts **live train positions** via WebSockets.  
+
+### Client Setup
+Create a file `client.js`:
+```javascript
+const WebSocket = require('ws');
+
+const ws = new WebSocket('ws://localhost:3000');
+
+ws.onopen = () => {
+  console.log('✅ Connected to backend server!');
+};
+
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  console.log('🚂 Train update received:', data);
+};
+
+ws.onerror = (error) => {
+  console.error('WebSocket Error:', error);
+};
+
+ws.onclose = () => {
+  console.log('Disconnected from the server.');
+};
+```
+
+Install WebSocket client:
+```bash
+npm install ws
+```
+
+Run the client:
+```bash
+node client.js
+```
+
+---
+
+## 📡 API Endpoints
+
+### 1. Get Station Snapshot
+```
+GET /api/v1/sections/:station_code/snapshot
+Example: http://localhost:3000/api/v1/sections/JP/snapshot
+```
+
+### 2. Get Train Details
+```
+GET /api/v1/trains/:train_no
+Example: http://localhost:3000/api/v1/trains/12986
+```
+
+---
+
+## 🔔 WebSocket Simulation
+
+- **URL**: `ws://localhost:3000`  
+- **Event**: `trainUpdate`  
+- **Payload**: JSON object with latest train position  
+
+---
+
+## ✅ Verification
+1. Start backend (`npm start`)  
+2. Start client (`node client.js`)  
+3. You should see live train updates in the terminal  
